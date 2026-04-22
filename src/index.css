@@ -173,6 +173,18 @@
   box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.15), 0 4px 10px -2px rgba(0, 0, 0, 0.05) !important;
   border-radius: 10px !important;
 }
+/* Evita que títulos/subtextos del slash menu se monten entre sí */
+.bn-suggestion-menu,
+.bn-suggestion-menu * {
+  line-height: 1.35 !important;
+}
+.bn-suggestion-menu [role='option'],
+.bn-suggestion-menu-item,
+.bn-suggestion-menu [data-selected] {
+  min-height: 44px !important;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+}
 /* Toolbar de formato y link: sombra más visible */
 .bn-formatting-toolbar,
 .bn-link-toolbar {

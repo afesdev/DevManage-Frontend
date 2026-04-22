@@ -388,6 +388,33 @@ export function GithubPage() {
             )}
           </div>
 
+          {proyectoActivoId && !githubConectado && (
+            <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">
+              <AlertCircle size={14} className="mt-0.5 shrink-0 text-amber-600" />
+              <div className="flex-1">
+                <p className="font-medium">GitHub no conectado</p>
+                <p className="mt-0.5 text-amber-700">
+                  Podras ver repos vinculados, pero algunos detalles pueden bloquearse por permisos hasta
+                  conectar tu cuenta.
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                className="h-7 shrink-0"
+                onClick={() => iniciarOAuth.mutate()}
+                disabled={iniciarOAuth.isPending || !token}
+              >
+                {iniciarOAuth.isPending ? (
+                  <LoaderCircle size={12} className="animate-spin" />
+                ) : (
+                  <FolderGit2 size={12} />
+                )}
+                Conectar
+              </Button>
+            </div>
+          )}
+
           {!proyectoActivoId ? (
             <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-stone-200 py-10">
               <AlertCircle size={20} className="text-amber-400" />
@@ -432,6 +459,11 @@ export function GithubPage() {
                       <Chip className="bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                         Activo
+                      </Chip>
+                    )}
+                    {!githubConectado && (
+                      <Chip className="bg-amber-50 text-amber-700 ring-1 ring-amber-200">
+                        Permisos limitados
                       </Chip>
                     )}
                   </div>

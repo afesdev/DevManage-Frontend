@@ -61,6 +61,8 @@ export function EditorDocumentoBlockNote({
   }, [editor, onMarkdownChange]);
 
   return (
-    <BlockNoteView editor={editor} editable={editable} theme="light" />
+    <div className="min-h-[180px]">
+      <BlockNoteView editor={editor} editable={editable} theme="light" />
+    </div>
   );
 }

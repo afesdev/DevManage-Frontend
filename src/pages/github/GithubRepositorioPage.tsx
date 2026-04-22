@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
+import { isAxiosError } from 'axios';
 import {
   ArrowRight,
   ChevronDown,
@@ -64,6 +65,20 @@ function inferirPersonaDesdeRama(nombreRama: string): string | null {
 
 function ramaPrefix(nombre: string): string {
   return nombre.includes('/') ? nombre.split('/')[0] : '';
+}
+
+function obtenerEstadoHttp(error: unknown): number | undefined {
+  if (!isAxiosError(error)) return undefined;
+  return error.response?.status;
+}
+
+function obtenerMensajeHttp(error: unknown): string | null {
+  if (!isAxiosError(error)) return null;
+  const data = error.response?.data as { message?: string | string[] } | undefined;
+  const message = data?.message;
+  if (Array.isArray(message)) return message[0] ?? null;
+  if (typeof message === 'string') return message;
+  return null;
 }
 
 // Genera color determinístico para avatares según string (author/branch)
@@ -239,10 +254,12 @@ export function GithubRepositorioPage() {
   const [tabActiva, setTabActiva] = useState<'prs' | 'ramas' | 'commits' | 'vinculos' | 'produccion'>('prs');
   const [mensajeSync, setMensajeSync] = useState<string | null>(null);
   const [buscarCommit, setBuscarCommit] = useState('');
+  const [filtroRamaCommits, setFiltroRamaCommits] = useState('todas');
   const [tareaTimelineId, setTareaTimelineId] = useState<string | null>(null);
   const [prodDesdeFecha, setProdDesdeFecha] = useState('');
   const [prodHastaFecha, setProdHastaFecha] = useState('');
   const [prodPersona, setProdPersona] = useState('todas');
+  const [gruposTrazabilidadAbiertos, setGruposTrazabilidadAbiertos] = useState<Set<string>>(new Set());
   const intentoAutoSync = useRef(false);
   const queryClient = useQueryClient();
 
@@ -295,9 +312,10 @@ export function GithubRepositorioPage() {
   });
 
   const commitsRepo = useQuery({
-    queryKey: ['github-repo-commits', repositorioId, token, buscarCommit],
+    queryKey: ['github-repo-commits', repositorioId, token, buscarCommit, filtroRamaCommits],
     queryFn: () =>
       githubService.obtenerCommitsRepositorio(repositorioId as string, token as string, {
+        rama: filtroRamaCommits === 'todas' ? undefined : filtroRamaCommits,
         q: buscarCommit.trim() || undefined,
         limit: 300,
       }),
@@ -318,6 +336,24 @@ export function GithubRepositorioPage() {
       githubService.obtenerTrazabilidadTarea(repositorioId as string, tareaTimelineId as string, token as string),
     enabled: Boolean(repositorioId && token && tareaTimelineId),
   });
+
+  const consultasRepositorio = [
+    repos,
+    ramas,
+    prs,
+    estadoDespliegue,
+    vinculosTareas,
+    archivosPr,
+    commitsPr,
+    commitsRepo,
+    eventosProduccion,
+    trazabilidadTarea,
+  ];
+
+  const consultaCon403 = consultasRepositorio.find((consulta) => obtenerEstadoHttp(consulta.error) === 403);
+  const mensajeAcceso =
+    (consultaCon403 ? obtenerMensajeHttp(consultaCon403.error) : null) ??
+    'No tienes acceso a este repositorio o necesitas conectar tu cuenta de GitHub.';
 
   const personasProduccion = useMemo(() => {
     const set = new Set<string>();
@@ -452,7 +488,9 @@ export function GithubRepositorioPage() {
 
   // Agrupar commits por día para un timeline legible
   const commitsAgrupados = useMemo(() => {
-    const lista = commitsRepo.data ?? [];
+    const lista = [...(commitsRepo.data ?? [])].sort(
+      (a, b) => new Date(b.confirmado_en).getTime() - new Date(a.confirmado_en).getTime(),
+    );
     type Commit = (typeof lista)[number];
     const map = new Map<string, Commit[]>();
     for (const c of lista) {
@@ -461,7 +499,12 @@ export function GithubRepositorioPage() {
       arr.push(c);
       map.set(clave, arr);
     }
-    return [...map.entries()].map(([dia, items]) => ({ dia, items }));
+    return [...map.entries()].map(([dia, items]) => ({
+      dia,
+      items: [...items].sort(
+        (a, b) => new Date(b.confirmado_en).getTime() - new Date(a.confirmado_en).getTime(),
+      ),
+    }));
   }, [commitsRepo.data]);
 
   const estadisticasCommits = useMemo(() => {
@@ -541,12 +584,78 @@ export function GithubRepositorioPage() {
     if (e.tipo === 'pr_main') return 'PR a producción';
     return 'PR';
   };
+  const timelineAgrupadoPorPr = useMemo(() => {
+    const eventos = trazabilidadTarea.data ?? [];
+    const groups = new Map<
+      string,
+      {
+        key: string;
+        titulo: string;
+        prNumero: number | null;
+        rama: string | null;
+        eventos: TrazabilidadTareaEvento[];
+      }
+    >();
+
+    for (const evento of eventos) {
+      const key = evento.pr_numero ? `pr-${evento.pr_numero}` : `rama-${evento.rama ?? 'sin-rama'}`;
+      const existente = groups.get(key);
+      if (existente) {
+        existente.eventos.push(evento);
+        if (!existente.titulo && evento.titulo) existente.titulo = evento.titulo;
+        continue;
+      }
+      groups.set(key, {
+        key,
+        titulo: evento.titulo,
+        prNumero: evento.pr_numero ?? null,
+        rama: evento.rama ?? null,
+        eventos: [evento],
+      });
+    }
+
+    return [...groups.values()]
+      .map((group) => ({
+        ...group,
+        eventos: [...group.eventos].sort(
+          (a, b) => new Date(a.ocurrido_en).getTime() - new Date(b.ocurrido_en).getTime(),
+        ),
+      }))
+      .sort((a, b) => {
+        const aTime = new Date(a.eventos[a.eventos.length - 1]?.ocurrido_en ?? 0).getTime();
+        const bTime = new Date(b.eventos[b.eventos.length - 1]?.ocurrido_en ?? 0).getTime();
+        return bTime - aTime;
+      });
+  }, [trazabilidadTarea.data]);
+  useEffect(() => {
+    if (timelineAgrupadoPorPr.length === 0) {
+      setGruposTrazabilidadAbiertos(new Set());
+      return;
+    }
+    setGruposTrazabilidadAbiertos((prev) => {
+      const keys = new Set(timelineAgrupadoPorPr.map((g) => g.key));
+      const filtrado = new Set([...prev].filter((k) => keys.has(k)));
+      if (filtrado.size > 0) return filtrado;
+      return new Set([timelineAgrupadoPorPr[0].key]);
+    });
+  }, [timelineAgrupadoPorPr]);
 
   // ── Not found ──────────────────────────────────────────────────────────────
   if (!repos.isLoading && !repo) {
     return (
       <div className="space-y-3 p-4">
         <p className="text-sm text-stone-600">Repositorio no encontrado en el proyecto activo.</p>
+        <Link to="/github" className="text-sm text-purple-700 hover:underline">← Volver a GitHub</Link>
+      </div>
+    );
+  }
+  if (consultaCon403) {
+    return (
+      <div className="space-y-3 p-4">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-medium text-amber-800">Acceso restringido</p>
+          <p className="mt-1 text-sm text-amber-700">{mensajeAcceso}</p>
+        </div>
         <Link to="/github" className="text-sm text-purple-700 hover:underline">← Volver a GitHub</Link>
       </div>
     );
@@ -962,7 +1071,7 @@ export function GithubRepositorioPage() {
 
         {/* ── Tab: Commits ── */}
         {tabActiva === 'commits' && (
-          <div className="flex-1">
+          <div className="flex h-full flex-1 flex-col overflow-hidden">
             {/* Barra sticky: búsqueda + métricas */}
             <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-stone-100 bg-white/95 px-4 py-2.5 backdrop-blur">
               <div className="relative min-w-[220px] flex-1">
@@ -975,6 +1084,18 @@ export function GithubRepositorioPage() {
                   className="h-8 w-full rounded-lg border border-stone-200 bg-stone-50 pl-7 pr-3 text-[12px] outline-none transition focus:border-purple-300 focus:bg-white focus:ring-2 focus:ring-purple-200"
                 />
               </div>
+              <select
+                value={filtroRamaCommits}
+                onChange={(e) => setFiltroRamaCommits(e.target.value)}
+                className="h-8 min-w-[220px] rounded-lg border border-stone-200 bg-white px-2.5 text-[12px] text-stone-600 outline-none focus:ring-2 focus:ring-purple-200"
+              >
+                <option value="todas">Todas las ramas</option>
+                {(ramas.data ?? []).map((rama) => (
+                  <option key={rama.rama_id} value={rama.nombre}>
+                    {rama.nombre}
+                  </option>
+                ))}
+              </select>
               <div className="flex items-center gap-4 text-[11px]">
                 <span className="flex items-center gap-1.5">
                   <GitCommitHorizontal size={12} className="text-stone-400" />
@@ -992,6 +1113,7 @@ export function GithubRepositorioPage() {
               </div>
             </div>
 
+            <div className="min-h-0 flex-1 overflow-y-auto">
             {commitsRepo.isLoading ? (
               <div className="flex items-center justify-center py-12"><LoaderCircle size={18} className="animate-spin text-stone-300" /></div>
             ) : (commitsRepo.data?.length ?? 0) === 0 ? (
@@ -1100,6 +1222,7 @@ export function GithubRepositorioPage() {
                 ))}
               </div>
             )}
+            </div>
           </div>
         )}
 
@@ -1232,19 +1355,60 @@ export function GithubRepositorioPage() {
                 <p className="p-4 text-[12px] text-stone-500">Sin eventos de trazabilidad para esta tarea.</p>
               ) : (
                 <div className="space-y-2 p-3">
-                  {(trazabilidadTarea.data ?? []).map((e, idx) => (
-                    <div key={`${e.tipo}-${e.ocurrido_en}-${idx}`} className="rounded-lg border border-stone-200 bg-white px-3 py-2">
-                      <p className="text-[11px] font-semibold text-stone-700">{etiquetaEvento(e)}</p>
-                      <p className="text-[11px] text-stone-500">{fechaCorta(e.ocurrido_en)} · {fechaRelativa(e.ocurrido_en)}</p>
-                      <p className="mt-1 text-[12px] text-stone-700">{e.titulo}</p>
-                      <p className="mt-1 break-all font-mono text-[10px] text-stone-500">
-                        {e.pr_numero ? `PR #${e.pr_numero}` : ''}
-                        {e.sha ? ` SHA ${e.sha.slice(0, 8)}` : ''}
-                        {e.rama ? ` · ${e.rama}` : ''}
-                        {e.rama_destino ? ` → ${e.rama_destino}` : ''}
-                      </p>
+                  {timelineAgrupadoPorPr.map((group) => {
+                    const expandido = gruposTrazabilidadAbiertos.has(group.key);
+                    return (
+                    <div key={group.key} className="rounded-lg border border-stone-200 bg-white">
+                      <button
+                        type="button"
+                        className="flex w-full items-start gap-2 border-b border-stone-100 bg-stone-50 px-3 py-2 text-left"
+                        onClick={() =>
+                          setGruposTrazabilidadAbiertos((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(group.key)) next.delete(group.key);
+                            else next.add(group.key);
+                            return next;
+                          })
+                        }
+                      >
+                        <ChevronDown
+                          size={14}
+                          className={cn('mt-0.5 shrink-0 text-stone-500 transition-transform', !expandido && '-rotate-90')}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-semibold text-stone-700">
+                            {group.prNumero ? `PR #${group.prNumero}` : 'Eventos por rama'}
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-stone-500">
+                            {group.titulo}
+                            {group.rama ? ` · ${group.rama}` : ''}
+                          </p>
+                        </div>
+                      </button>
+                      {expandido && (
+                        <div className="space-y-2 px-3 py-2">
+                          {group.eventos.map((e, idx) => (
+                            <div
+                              key={`${group.key}-${e.tipo}-${e.ocurrido_en}-${idx}`}
+                              className="rounded-md border border-stone-100 px-2.5 py-2"
+                            >
+                              <p className="text-[11px] font-semibold text-stone-700">{etiquetaEvento(e)}</p>
+                              <p className="text-[11px] text-stone-500">
+                                {fechaCorta(e.ocurrido_en)} · {fechaRelativa(e.ocurrido_en)}
+                              </p>
+                              <p className="mt-1 text-[12px] text-stone-700">{e.titulo}</p>
+                              <p className="mt-1 break-all font-mono text-[10px] text-stone-500">
+                                {e.sha ? `SHA ${e.sha.slice(0, 8)}` : ''}
+                                {e.rama ? ` · ${e.rama}` : ''}
+                                {e.rama_destino ? ` → ${e.rama_destino}` : ''}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

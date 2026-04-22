@@ -13,7 +13,11 @@ export const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error?.response?.status === 401) {
+    const status = error?.response?.status;
+    const requestUrl = String(error?.config?.url ?? '');
+    const esValidacionSesion = requestUrl.includes('/auth/me');
+
+    if (status === 401 && esValidacionSesion) {
       useAuthStore.getState().setToken(null);
       if (window.location.pathname !== '/auth') {
         window.location.href = '/auth';

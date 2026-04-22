@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { CircleUserRound, KeyRound, Mail, Sparkles } from 'lucide-react';
+import { CircleUserRound, Eye, EyeOff, KeyRound, Loader2, Mail, Sparkles } from 'lucide-react';
 import { authService } from '../../services/auth.service';
 import { useAuthStore } from '../../store/auth.store';
 import { useToastStore } from '../../store/toast.store';
 import { Button } from '../../components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Separator } from '../../components/ui/separator';
 import type { CredencialesLogin, CredencialesRegistro } from '../../types/auth';
@@ -18,6 +17,7 @@ export function AuthPage() {
   const [correo, setCorreo] = useState('');
   const [nombreVisible, setNombreVisible] = useState('');
   const [contrasena, setContrasena] = useState('');
+  const [mostrarContrasena, setMostrarContrasena] = useState(false);
   const setToken = useAuthStore((s) => s.setToken);
   const setProyectoActivo = useAuthStore((s) => s.setProyectoActivo);
   const pushToast = useToastStore((s) => s.pushToast);
@@ -50,9 +50,9 @@ export function AuthPage() {
     <main className="relative min-h-screen overflow-hidden bg-stone-100">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_20%,rgba(83,74,183,0.16),transparent_35%),radial-gradient(circle_at_85%_15%,rgba(29,158,117,0.15),transparent_30%)]" />
 
-      <section className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center p-6">
-        <div className="grid w-full overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-2xl lg:grid-cols-2">
-          <aside className="hidden bg-gradient-to-br from-purple-700 via-purple-600 to-indigo-600 p-8 text-white lg:block">
+      <section className="relative z-10 min-h-screen w-full">
+        <div className="grid min-h-screen w-full bg-white md:grid-cols-2">
+          <aside className="order-2 flex min-h-[44vh] flex-col justify-center bg-gradient-to-br from-purple-700 via-purple-600 to-indigo-600 p-8 text-white md:order-1 md:min-h-full md:p-10">
             <p className="text-xs uppercase tracking-[0.24em] text-white/70">DevManage</p>
             <h1 className="mt-4 text-3xl font-semibold leading-tight">
               Administra todo tu ciclo de desarrollo en una sola plataforma.
@@ -73,12 +73,12 @@ export function AuthPage() {
             </div>
           </aside>
 
-          <Card className="rounded-none border-0 shadow-none">
-            <CardHeader className="p-6 sm:p-10 sm:pb-4">
+          <div className="order-1 flex min-h-[56vh] flex-col justify-center bg-white md:order-2 md:min-h-full">
+            <div className="p-6 sm:p-10 sm:pb-4">
               <div className="mb-2 flex items-center justify-between">
-                <CardDescription className="text-xs uppercase tracking-[0.2em] text-stone-400">
+                <p className="text-xs uppercase tracking-[0.2em] text-stone-400">
                   Acceso seguro
-                </CardDescription>
+                </p>
                 <Button
                   variant="outline"
                   size="sm"
@@ -87,12 +87,12 @@ export function AuthPage() {
                   {modo === 'login' ? 'Registrarme' : 'Ya tengo cuenta'}
                 </Button>
               </div>
-              <CardTitle className="text-2xl text-stone-900">
+              <h2 className="text-2xl font-semibold text-stone-900">
                 {modo === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
-              </CardTitle>
-            </CardHeader>
+              </h2>
+            </div>
 
-            <CardContent className="space-y-4 p-6 sm:px-10 sm:pb-10">
+            <div className="space-y-4 p-6 sm:px-10 sm:pb-10">
               <Separator />
 
               <form
@@ -107,17 +107,22 @@ export function AuthPage() {
                   <div className="relative mt-1">
                     <Mail
                       size={16}
-                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-500"
                     />
                     <Input
                       value={correo}
                       onChange={(e) => setCorreo(e.target.value)}
                       type="email"
                       required
-                      className="pl-9"
+                      autoComplete="email"
+                      spellCheck={false}
+                      className="h-11 border-stone-300 pl-10 text-[15px] placeholder:text-stone-400 focus-visible:border-purple-500 focus-visible:ring-[3px] focus-visible:ring-purple-200/70"
                       placeholder="tu@correo.com"
                     />
                   </div>
+                  <p className="mt-1 text-xs font-normal text-stone-500">
+                    Usa el correo con el que creaste tu cuenta.
+                  </p>
                 </label>
 
                 {modo === 'registro' ? (
@@ -145,30 +150,51 @@ export function AuthPage() {
                   <div className="relative mt-1">
                     <KeyRound
                       size={16}
-                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-500"
                     />
                     <Input
                       value={contrasena}
                       onChange={(e) => setContrasena(e.target.value)}
-                      type="password"
+                      type={mostrarContrasena ? 'text' : 'password'}
                       minLength={8}
                       required
-                      className="pl-9"
+                      autoComplete={modo === 'login' ? 'current-password' : 'new-password'}
+                      className="h-11 border-stone-300 pl-10 pr-12 text-[15px] placeholder:text-stone-400 focus-visible:border-purple-500 focus-visible:ring-[3px] focus-visible:ring-purple-200/70"
                       placeholder="Minimo 8 caracteres"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setMostrarContrasena((valor) => !valor)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500 transition-colors hover:text-stone-700"
+                      aria-label={mostrarContrasena ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    >
+                      {mostrarContrasena ? <EyeOff size={17} /> : <Eye size={17} />}
+                    </button>
                   </div>
+                  <p className="mt-1 text-xs font-normal text-stone-500">
+                    Debe tener al menos 8 caracteres.
+                  </p>
                 </label>
 
-                <Button type="submit" disabled={mutation.isPending} className="w-full">
-                  {mutation.isPending
-                    ? 'Procesando...'
-                    : modo === 'login'
-                      ? 'Iniciar sesión'
-                      : 'Crear cuenta'}
+                <Button
+                  type="submit"
+                  disabled={mutation.isPending}
+                  className="h-11 w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition-all duration-200 hover:from-purple-700 hover:to-indigo-700 hover:shadow-indigo-300 disabled:cursor-not-allowed disabled:opacity-90"
+                >
+                  {mutation.isPending ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 size={16} className="animate-spin" />
+                      Procesando...
+                    </span>
+                  ) : modo === 'login' ? (
+                    'Iniciar sesión'
+                  ) : (
+                    'Crear cuenta'
+                  )}
                 </Button>
               </form>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       </section>
     </main>

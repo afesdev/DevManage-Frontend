@@ -22,7 +22,7 @@ import {
   Hash,
   Layers,
   LoaderCircle,
-  MessageSquare,
+  Pencil,
   Plus,
   Search,
   SquareKanban,
@@ -228,8 +228,7 @@ function colorEpica(epicaId: string): string {
 
 // Días hasta la fecha (negativo = vencida)
 function diasHasta(fechaIso: string): number {
-  const ymd = fechaIso.includes('T') ? fechaIso.slice(0, 10) : fechaIso.slice(0, 10);
-  const [y, m, d] = ymd.split('-').map((n) => parseInt(n, 10));
+  const [y, m, d] = fechaIso.slice(0, 10).split('-').map((n) => parseInt(n, 10));
   if (!y || !m || !d) return Infinity;
   const fecha = new Date(y, m - 1, d);
   const hoy = new Date();
@@ -668,17 +667,15 @@ function CampoDescripcionMarkdown({
     <div className="space-y-1.5">
       <div
         className={cn(
-          'rounded-lg border border-stone-200 bg-white overflow-hidden',
+          'min-h-[520px] rounded-lg border border-stone-200 bg-white',
           disabled && 'opacity-70',
         )}
       >
-        <div className="min-h-[180px] max-h-[500px] overflow-y-auto [&_.bn-editor]:min-h-[180px] [&_.bn-editor]:px-4 [&_.bn-editor]:py-3">
-          <EditorDocumentoBlockNote
-            initialMarkdown={value}
-            onMarkdownChange={onChange}
-            editable={!disabled}
-          />
-        </div>
+        <EditorDocumentoBlockNote
+          initialMarkdown={value}
+          onMarkdownChange={onChange}
+          editable={!disabled}
+        />
       </div>
       <p className="text-[11px] text-stone-400">
         Usa <kbd className="rounded bg-stone-100 px-1 font-mono text-[10px] text-stone-600">/</kbd>
@@ -687,80 +684,6 @@ function CampoDescripcionMarkdown({
     </div>
   );
 }
-
-function BloqueDescripcionTrello({
-  value,
-  onChange,
-  disabled,
-  editando,
-  onToggleEditar,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  disabled?: boolean;
-  editando: boolean;
-  onToggleEditar: (v: boolean) => void;
-}) {
-  const vacio = !value?.trim();
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <MessageSquare size={14} className="text-stone-400" />
-          <h3 className="text-[13px] font-semibold text-stone-700">Descripción</h3>
-        </div>
-        {!disabled && (
-          <button
-            type="button"
-            className={cn(
-              'rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all',
-              editando
-                ? 'bg-purple-600 text-white shadow-sm ring-1 ring-purple-700/20'
-                : 'text-purple-600 hover:bg-purple-50',
-            )}
-            onClick={() => onToggleEditar(!editando)}
-          >
-            {editando ? 'Finalizar edición' : vacio ? 'Añadir descripción' : 'Editar'}
-          </button>
-        )}
-      </div>
-
-      <div
-        className={cn(
-          'overflow-hidden rounded-xl border bg-white transition-all',
-          editando ? 'border-purple-200 shadow-inner' : 'border-stone-200',
-        )}
-      >
-        <div className={cn('px-3 py-3', editando ? 'min-h-[360px]' : 'min-h-[180px]')}>
-          {vacio && !editando ? (
-            <button
-              onClick={() => onToggleEditar(true)}
-              className="flex w-full flex-col items-center justify-center py-12 text-stone-300 transition-colors hover:text-purple-400"
-            >
-              <Plus size={32} strokeWidth={1.5} />
-              <span className="mt-2 px-6 text-center text-[13px] font-medium">
-                Haz clic para añadir detalles técnicos, criterios de aceptación o documentación...
-              </span>
-            </button>
-          ) : (
-            <EditorDocumentoBlockNote
-              initialMarkdown={value}
-              onMarkdownChange={onChange}
-              editable={editando && !disabled}
-            />
-          )}
-        </div>
-      </div>
-
-      <p className="text-[11px] text-stone-400">
-        Usa <kbd className="rounded bg-stone-100 px-1 font-mono text-[10px] text-stone-600">/</kbd>{' '}
-        para insertar títulos, listas, tablas, código y más
-        {!editando ? ' (activa "Editar" para usar atajos)' : ''}.
-      </p>
-    </div>
-  );
-}
-void BloqueDescripcionTrello;
 
 const SELECT_REF_PANEL =
   'h-8 w-full max-w-full min-w-0 rounded-lg border border-stone-200 bg-white px-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-purple-300 disabled:opacity-50';
@@ -886,11 +809,14 @@ export function TableroPage() {
     nombre: string;
     color: string;
   }>({ etiqueta_id: null, nombre: '', color: '#7c3aed' });
+  const [etiquetasNuevaTareaSeleccionadas, setEtiquetasNuevaTareaSeleccionadas] = useState<string[]>([]);
   const [errorEtiqueta, setErrorEtiqueta] = useState<string | null>(null);
   const [nuevoComentario, setNuevoComentario] = useState('');
   const [errorComentario, setErrorComentario] = useState<string | null>(null);
   const [comentarioEditando, setComentarioEditando] = useState<ComentarioTareaResumen | null>(null);
   const [contenidoComentarioEdicion, setContenidoComentarioEdicion] = useState('');
+  
+
   void usuarioActualId;
   void errorEdicion;
   void errorEtiqueta;
@@ -1217,15 +1143,15 @@ export function TableroPage() {
       const tareaTemporal: TareaTablero = {
         tarea_id: `temp-${Date.now()}`,
         proyecto_id: proyectoId as string,
-        epica_id: null,
-        tarea_padre_id: null,
+        epica_id: args.valores.epica_id || null,
+        tarea_padre_id: args.valores.tarea_padre_id || null,
         columna_id: args.columnaId,
         titulo: args.valores.titulo.trim(),
         descripcion: args.valores.descripcion.trim() || null,
         tipo: args.valores.tipo,
         prioridad: args.valores.prioridad,
         posicion: args.posicion,
-        responsable_id: null,
+        responsable_id: args.valores.responsable_id || null,
         creado_por: 'yo',
         fecha_limite: args.valores.fecha_limite || null,
         creado_en: new Date().toISOString(),
@@ -1239,6 +1165,15 @@ export function TableroPage() {
         tareaTemporal,
       ]);
       return { anteriores, queryKey };
+    },
+    onSuccess: async (tareaCreada) => {
+      if (!etiquetasNuevaTareaSeleccionadas.length) return;
+      await Promise.all(
+        etiquetasNuevaTareaSeleccionadas.map((etiquetaId) =>
+          tableroService.asignarEtiquetaATarea(tareaCreada.tarea_id, etiquetaId, token as string),
+        ),
+      );
+      queryClient.invalidateQueries({ queryKey: ['tablero-tareas-etiquetas', proyectoId, token] });
     },
     onError: (_error, _args, context) => {
       if (context?.anteriores) queryClient.setQueryData(context.queryKey, context.anteriores);
@@ -1467,6 +1402,7 @@ export function TableroPage() {
     setColumnaCrearId(columnaId);
     setErrorCrearTarea(null);
     setFormNuevaTarea(estadoInicialNuevaTarea());
+    setEtiquetasNuevaTareaSeleccionadas([]);
     setPanelActivo('crear');
   }
 
@@ -2163,6 +2099,7 @@ export function TableroPage() {
                     <div className="space-y-1">
                       <FieldLabel>Descripción</FieldLabel>
                       <CampoDescripcionMarkdown
+                        key={`nueva-tarea-desc-${columnaCrearId}`}
                         value={formNuevaTarea.descripcion}
                         onChange={(value) =>
                           setFormNuevaTarea((prev) => ({ ...prev, descripcion: value }))
@@ -2176,7 +2113,7 @@ export function TableroPage() {
                       <summary className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-wide text-stone-400 group-open:mb-2">
                         Campos opcionales
                       </summary>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <BloqueSelectorEpica
                           epicaId={formNuevaTarea.epica_id}
                           onEpicaChange={(id) =>
@@ -2253,6 +2190,54 @@ export function TableroPage() {
                             ))}
                           </select>
                         </div>
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <FieldLabel>Etiquetas</FieldLabel>
+                            {etiquetasNuevaTareaSeleccionadas.length > 0 ? (
+                              <button
+                                type="button"
+                                className="text-[11px] font-medium text-purple-600 hover:text-purple-800"
+                                onClick={() => setEtiquetasNuevaTareaSeleccionadas([])}
+                              >
+                                Limpiar
+                              </button>
+                            ) : null}
+                          </div>
+                          {etiquetasLista.length === 0 ? (
+                            <p className="text-[11px] text-stone-400 italic">
+                              No hay etiquetas creadas en este proyecto.
+                            </p>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5">
+                              {etiquetasLista.map((etq) => {
+                                const activa = etiquetasNuevaTareaSeleccionadas.includes(etq.etiqueta_id);
+                                return (
+                                  <button
+                                    key={etq.etiqueta_id}
+                                    type="button"
+                                    onClick={() =>
+                                      setEtiquetasNuevaTareaSeleccionadas((prev) =>
+                                        prev.includes(etq.etiqueta_id)
+                                          ? prev.filter((id) => id !== etq.etiqueta_id)
+                                          : [...prev, etq.etiqueta_id],
+                                      )
+                                    }
+                                    className={cn(
+                                      'inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold ring-1 transition',
+                                      activa
+                                        ? 'text-white ring-transparent'
+                                        : 'bg-white text-stone-600 ring-stone-200 hover:bg-stone-50',
+                                    )}
+                                    style={activa ? { backgroundColor: etq.color } : undefined}
+                                  >
+                                    {etq.nombre}
+                                    {activa ? <CheckCircle2 size={10} /> : null}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
 
                       </div>
                     </details>
@@ -2287,299 +2272,286 @@ export function TableroPage() {
         </div>
       </div>
 
-      {/* ══ MODAL DE DETALLE DE TAREA ══════════════════════════════════════════════ */}
+      {/* ══ DETALLE DE TAREA — DRAWER LATERAL ══════════════════════════════════════ */}
       {panelActivo === 'detalle' && tareaDetalle && formEdicion && columnaEdicionId && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px] animate-in fade-in duration-150"
-          onClick={cerrarPanel}
-        >
+        <>
+          {/* Backdrop para cerrar */}
           <div
-            className="relative flex h-full max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-xl animate-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Barra superior: ID + cerrar */}
-            <div className="flex shrink-0 items-center justify-between border-b border-stone-100 px-6 py-2.5">
-              <button
-                onClick={() => navigator.clipboard.writeText(tareaDetalle.tarea_id)}
-                title="Copiar ID"
-                className="font-mono text-[11px] text-stone-400 hover:text-purple-500 transition-colors"
-              >
-                #{tareaDetalle.tarea_id.slice(0, 8)}
-              </button>
-              <button
-                type="button"
-                onClick={cerrarPanel}
-                className="rounded p-1.5 text-stone-400 transition hover:bg-stone-100 hover:text-stone-600"
-              >
-                <X size={16} />
-              </button>
+            className="fixed inset-0 z-40 bg-black/25 animate-in fade-in duration-200"
+            onClick={cerrarPanel}
+          />
+
+          {/* Panel deslizante desde la derecha */}
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[700px] flex-col bg-white shadow-2xl border-l border-stone-200 animate-in slide-in-from-right duration-250">
+
+            {/* ── Cabecera fija ─────────────────────────────────────────── */}
+            <div className="shrink-0 flex items-center justify-between gap-4 border-b border-stone-100 px-6 py-3 bg-white">
+              <div className="flex items-center gap-3 min-w-0">
+                <button
+                  onClick={() => navigator.clipboard.writeText(tareaDetalle.tarea_id)}
+                  title="Copiar ID completo"
+                  className="shrink-0 font-mono text-[11px] text-stone-400 hover:text-purple-500 transition-colors"
+                >
+                  #{tareaDetalle.tarea_id.slice(0, 8)}
+                </button>
+                {tareaDetalle.tarea_id.startsWith('temp-') && (
+                  <span className="flex items-center gap-1 text-[11px] text-amber-600 bg-amber-50 rounded px-2 py-0.5">
+                    <LoaderCircle size={11} className="animate-spin" /> Sincronizando…
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  className="h-7 px-4 text-[12px] bg-purple-600 hover:bg-purple-700"
+                  disabled={actualizarTarea.isPending}
+                  onClick={() => {
+                    if (!formEdicion.titulo.trim()) return setErrorEdicion('Título requerido');
+                    actualizarTarea.mutate({ tareaId: tareaDetalle.tarea_id, payload: construirPayloadEdicion(formEdicion, columnaEdicionId, tareaDetalle) });
+                  }}
+                >
+                  {actualizarTarea.isPending ? <LoaderCircle size={12} className="animate-spin mr-1" /> : null}
+                  Guardar
+                </Button>
+                <button
+                  type="button"
+                  onClick={cerrarPanel}
+                  className="rounded p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
-            {/* Título editable */}
-            <div className="shrink-0 border-b border-stone-100 px-8 py-4">
+            {/* ── Contenido con scroll (incluye título y opciones) ─────── */}
+            <div className="flex-1 overflow-y-auto">
+            {/* ── Título ────────────────────────────────────────────────── */}
+            <div className="px-6 pt-5 pb-3">
               <textarea
                 value={formEdicion.titulo}
-                onChange={(e) => setFormEdicion(p => p ? {...p, titulo: e.target.value} : p)}
-                rows={1}
-                className="w-full resize-none border-none bg-transparent p-0 text-[20px] font-semibold text-stone-900 outline-none focus:ring-0 leading-snug placeholder:text-stone-300"
+                onChange={(e) => setFormEdicion(p => p ? { ...p, titulo: e.target.value } : p)}
+                rows={2}
+                className="w-full resize-none bg-transparent text-[22px] font-bold text-stone-900 outline-none leading-snug placeholder:text-stone-300 border-none focus:ring-0 p-0"
                 disabled={tareaDetalle.tarea_id.startsWith('temp-')}
-                placeholder="Título de la tarea..."
+                placeholder="Título de la tarea…"
               />
             </div>
 
-            {/* Cuerpo (Dos Columnas) */}
-            <div className="flex flex-1 overflow-hidden">
-              {/* Columna izquierda: contenido */}
-              <div className="flex-1 overflow-y-auto px-8 py-6 space-y-7">
-                {tareaDetalle.tarea_id.startsWith('temp-') && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12px] text-amber-700 flex items-center gap-2">
-                    <LoaderCircle size={14} className="animate-spin" />
-                    Sincronizando con el servidor...
-                  </div>
-                )}
-
-                {/* Descripción */}
-                <div>
-                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-stone-400">Descripción</p>
-                  <CampoDescripcionMarkdown
-                    key={`detalle-desc-${tareaDetalle.tarea_id}-${tareaDetalle.actualizado_en}`}
-                    value={formEdicion.descripcion}
-                    onChange={(value) =>
-                      setFormEdicion((prev) => (prev ? { ...prev, descripcion: value } : prev))
-                    }
-                    placeholder="Contexto, criterios de aceptación, notas técnicas..."
-                    disabled={false}
-                  />
-                </div>
-
-                {/* Comentarios */}
-                <div className="space-y-4 pt-5 border-t border-stone-100">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">Comentarios</p>
-                  <div className="rounded-lg border border-stone-200 bg-stone-50/50 p-3">
-                    <textarea
-                      value={nuevoComentario}
-                      onChange={(e) => setNuevoComentario(e.target.value)}
-                      placeholder="Escribe un comentario..."
-                      rows={2}
-                      className="w-full resize-none border-0 bg-transparent text-[13px] text-stone-700 outline-none placeholder:text-stone-400"
-                    />
-                    <div className="mt-2 flex justify-end">
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="h-7 px-4 text-[12px] bg-purple-600 hover:bg-purple-700"
-                        disabled={!nuevoComentario.trim() || crearComentario.isPending}
-                        onClick={() => crearComentario.mutate(tareaDetalle.tarea_id)}
-                      >
-                        {crearComentario.isPending ? <LoaderCircle size={12} className="animate-spin mr-1.5" /> : null}
-                        Enviar
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    {comentariosLista.map((c) => (
-                      <div key={c.comentario_id} className="flex gap-3">
-                        <div className={cn("h-7 w-7 shrink-0 rounded-full flex items-center justify-center text-[12px] font-bold", colorAvatar(c.autor_id).bg, colorAvatar(c.autor_id).text)}>
-                          {c.autor_nombre[0].toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-baseline gap-2 mb-0.5">
-                            <span className="text-[12px] font-semibold text-stone-800">{c.autor_nombre}</span>
-                            <span className="text-[10px] text-stone-400">{new Date(c.creado_en).toLocaleString()}</span>
-                          </div>
-                          <p className="text-[13px] leading-relaxed text-stone-600 whitespace-pre-wrap">{c.contenido}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            {/* ── Propiedades inline ────────────────────────────────────── */}
+            <div className="px-6 pb-4 flex flex-wrap gap-x-6 gap-y-2 border-b border-stone-100">
+              <div className="flex items-center gap-1.5">
+                <Layers size={12} className="text-stone-400" />
+                <select
+                  value={columnaEdicionId}
+                  onChange={(e) => setColumnaEdicionId(e.target.value)}
+                  className="bg-transparent text-[12px] text-stone-600 outline-none border-none p-0 cursor-pointer font-medium"
+                >
+                  {(columnas.data ?? []).map((col) => (
+                    <option key={col.columna_id} value={col.columna_id}>{col.nombre}</option>
+                  ))}
+                </select>
               </div>
+              <div className="flex items-center gap-1.5">
+                <AlertCircle size={12} className="text-stone-400" />
+                <select
+                  value={formEdicion.prioridad}
+                  onChange={(e) => setFormEdicion(p => p ? { ...p, prioridad: e.target.value as any } : p)}
+                  className="bg-transparent text-[12px] text-stone-600 outline-none border-none p-0 cursor-pointer font-medium"
+                >
+                  <option value="critica">Crítica</option>
+                  <option value="alta">Alta</option>
+                  <option value="media">Media</option>
+                  <option value="baja">Baja</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Hash size={12} className="text-stone-400" />
+                <select
+                  value={formEdicion.tipo}
+                  onChange={(e) => setFormEdicion(p => p ? { ...p, tipo: e.target.value as any } : p)}
+                  className="bg-transparent text-[12px] text-stone-600 outline-none border-none p-0 cursor-pointer font-medium"
+                >
+                  <option value="tarea">Tarea</option>
+                  <option value="subtarea">Subtarea</option>
+                  <option value="error">Error</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Calendar size={12} className="text-stone-400" />
+                <input
+                  type="date"
+                  value={formEdicion.fecha_limite}
+                  onChange={(e) => setFormEdicion(p => p ? { ...p, fecha_limite: e.target.value } : p)}
+                  className="bg-transparent text-[12px] text-stone-600 outline-none border-none p-0 cursor-pointer font-medium"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Pencil size={12} className="text-stone-400" />
+                <select
+                  value={formEdicion.responsable_id}
+                  onChange={(e) => setFormEdicion(p => p ? { ...p, responsable_id: e.target.value } : p)}
+                  className="bg-transparent text-[12px] text-stone-600 outline-none border-none p-0 cursor-pointer font-medium"
+                >
+                  <option value="">Sin asignar</option>
+                  {(miembrosProyecto.data ?? []).map((m) => (
+                    <option key={m.usuario_id} value={m.usuario_id}>{m.nombre_visible || m.correo}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-              {/* Columna derecha: propiedades */}
-              <div className="w-[230px] shrink-0 overflow-y-auto border-l border-stone-100 px-4 py-5 space-y-6">
-                {/* Propiedades */}
-                <div className="space-y-0.5">
-                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-stone-400">Propiedades</p>
-                  <div className="divide-y divide-stone-100">
-                    <div className="flex items-center justify-between py-2">
-                      <span className="flex items-center gap-1.5 text-[11px] text-stone-500"><Layers size={10} /> Estado</span>
-                      <select
-                        value={columnaEdicionId}
-                        onChange={(e) => setColumnaEdicionId(e.target.value)}
-                        className="bg-transparent text-[11px] font-medium text-stone-700 outline-none border-none p-0 focus:ring-0 text-right cursor-pointer max-w-[110px] truncate"
-                      >
-                        {(columnas.data ?? []).map((col) => (
-                          <option key={col.columna_id} value={col.columna_id}>{col.nombre}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex items-center justify-between py-2">
-                      <span className="flex items-center gap-1.5 text-[11px] text-stone-500"><AlertCircle size={10} /> Prioridad</span>
-                      <select
-                        value={formEdicion.prioridad}
-                        onChange={(e) => setFormEdicion(p => p ? {...p, prioridad: e.target.value as any} : p)}
-                        className="bg-transparent text-[11px] font-medium text-stone-700 outline-none border-none p-0 focus:ring-0 text-right cursor-pointer"
-                      >
-                        <option value="critica">Crítica</option>
-                        <option value="alta">Alta</option>
-                        <option value="media">Media</option>
-                        <option value="baja">Baja</option>
-                      </select>
-                    </div>
-                    <div className="flex items-center justify-between py-2">
-                      <span className="flex items-center gap-1.5 text-[11px] text-stone-500"><Hash size={10} /> Tipo</span>
-                      <select
-                        value={formEdicion.tipo}
-                        onChange={(e) => setFormEdicion(p => p ? {...p, tipo: e.target.value as any} : p)}
-                        className="bg-transparent text-[11px] font-medium text-stone-700 outline-none border-none p-0 focus:ring-0 text-right cursor-pointer"
-                      >
-                        <option value="tarea">Tarea</option>
-                        <option value="subtarea">Subtarea</option>
-                        <option value="error">Error</option>
-                      </select>
-                    </div>
-                    <div className="flex items-center justify-between py-2">
-                      <span className="flex items-center gap-1.5 text-[11px] text-stone-500"><Calendar size={10} /> Vence</span>
-                      <input
-                        type="date"
-                        value={formEdicion.fecha_limite}
-                        onChange={(e) => setFormEdicion(p => p ? {...p, fecha_limite: e.target.value} : p)}
-                        className="bg-transparent text-[11px] font-medium text-stone-700 outline-none border-none p-0 focus:ring-0 text-right cursor-pointer"
-                      />
-                    </div>
-                  </div>
-                </div>
+            {/* ── Cuerpo (columna única) ───────────────────────────────── */}
+            <div className="px-6 py-6 space-y-8">
 
-                {/* Asignación */}
-                <div className="space-y-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400">Asignación</p>
-                  <div className="divide-y divide-stone-100">
-                    <div className="py-2">
-                      <p className="text-[10px] text-stone-400 mb-1">Responsable</p>
-                      <select
-                        value={formEdicion.responsable_id}
-                        onChange={(e) => setFormEdicion(p => p ? {...p, responsable_id: e.target.value} : p)}
-                        className="w-full bg-transparent text-[11px] font-medium text-stone-700 outline-none p-0 border-none focus:ring-0"
-                      >
-                        <option value="">Sin asignar</option>
-                        {(miembrosProyecto.data ?? []).map((m) => (
-                          <option key={m.usuario_id} value={m.usuario_id}>{m.nombre_visible || m.correo}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="py-2">
-                      <p className="text-[10px] text-stone-400 mb-1">Tarea padre</p>
-                      <select
-                        value={formEdicion.tarea_padre_id}
-                        onChange={(e) => setFormEdicion(p => p ? {...p, tarea_padre_id: e.target.value} : p)}
-                        className="w-full bg-transparent text-[11px] font-medium text-stone-700 outline-none p-0 border-none focus:ring-0"
-                      >
-                        <option value="">Ninguna</option>
-                        {tareasPadreEdicion.map((t) => (
-                          <option key={t.tarea_id} value={t.tarea_id}>{t.titulo}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <BloqueSelectorEpica
-                    epicaId={formEdicion.epica_id}
-                    onEpicaChange={(id) => setFormEdicion(p => p ? {...p, epica_id: id} : p)}
-                    epicasLista={epicas.data}
-                    epicasLoading={epicas.isLoading}
-                    nuevaEpicaUi={nuevaEpicaUi}
-                    setNuevaEpicaUi={setNuevaEpicaUi}
-                    setErrorCrearEpica={setErrorCrearEpica}
-                    crearEpicaPending={crearEpica.isPending}
-                    onSubmitNuevaEpica={() => crearEpica.mutate({ titulo: nuevaEpicaUi.titulo, destino: 'detalle' })}
-                    errorCrearEpica={errorCrearEpica}
+              {/* Descripción */}
+              <section>
+                <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-stone-400">Descripción</h3>
+                <div className="rounded-lg border border-stone-200 bg-white">
+                  <CampoDescripcionMarkdown
+                    key={`desc-${tareaDetalle.tarea_id}`}
+                    value={formEdicion.descripcion}
+                    onChange={(value) => setFormEdicion(p => p ? { ...p, descripcion: value } : p)}
+                    placeholder="Contexto, criterios de aceptación, notas técnicas…"
+                    disabled={tareaDetalle.tarea_id.startsWith('temp-')}
                   />
                 </div>
+              </section>
 
-                {/* Etiquetas */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400">Etiquetas</p>
+              {/* Contexto: épica, tarea padre, etiquetas */}
+              <section className="space-y-3">
+                <h3 className="text-[11px] font-semibold uppercase tracking-widest text-stone-400">Contexto</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-stone-400 uppercase tracking-wide">Tarea padre</p>
                     <select
-                      className="text-[10px] font-medium text-purple-600 bg-transparent outline-none cursor-pointer"
-                      onChange={(e) => e.target.value && asignarEtiqueta.mutate({ tareaId: tareaDetalle.tarea_id, etiquetaId: e.target.value })}
-                      value=""
+                      value={formEdicion.tarea_padre_id}
+                      onChange={(e) => setFormEdicion(p => p ? { ...p, tarea_padre_id: e.target.value } : p)}
+                      className="w-full rounded border border-stone-200 bg-white text-[12px] text-stone-700 px-2 py-1.5 outline-none focus:ring-1 focus:ring-purple-300"
                     >
-                      <option value="">+ añadir</option>
-                      {etiquetasLista.filter(etq => !(etiquetasPorTarea.get(tareaDetalle.tarea_id) ?? []).some(t => t.etiqueta_id === etq.etiqueta_id)).map(etq => (
-                        <option key={etq.etiqueta_id} value={etq.etiqueta_id}>{etq.nombre}</option>
+                      <option value="">Ninguna</option>
+                      {tareasPadreEdicion.map((t) => (
+                        <option key={t.tarea_id} value={t.tarea_id}>{t.titulo}</option>
                       ))}
                     </select>
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {(etiquetasPorTarea.get(tareaDetalle.tarea_id) ?? []).map((etq) => (
-                      <span key={etq.etiqueta_id} className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-white" style={{ backgroundColor: etq.color }}>
-                        {etq.nombre}
-                        <button onClick={() => quitarEtiqueta.mutate({ tareaId: tareaDetalle.tarea_id, etiquetaId: etq.etiqueta_id })} className="hover:opacity-70">
-                          <X size={9} />
-                        </button>
-                      </span>
-                    ))}
-                    {(etiquetasPorTarea.get(tareaDetalle.tarea_id) ?? []).length === 0 && (
-                      <span className="text-[11px] text-stone-300">—</span>
-                    )}
+                  <div className="space-y-1">
+                    <BloqueSelectorEpica
+                      epicaId={formEdicion.epica_id}
+                      onEpicaChange={(id) => setFormEdicion(p => p ? { ...p, epica_id: id } : p)}
+                      epicasLista={epicas.data}
+                      epicasLoading={epicas.isLoading}
+                      nuevaEpicaUi={nuevaEpicaUi}
+                      setNuevaEpicaUi={setNuevaEpicaUi}
+                      setErrorCrearEpica={setErrorCrearEpica}
+                      crearEpicaPending={crearEpica.isPending}
+                      onSubmitNuevaEpica={() => crearEpica.mutate({ titulo: nuevaEpicaUi.titulo, destino: 'detalle' })}
+                      errorCrearEpica={errorCrearEpica}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] text-stone-400 uppercase tracking-wide">Etiquetas</p>
+                    <select
+                      className="text-[11px] text-purple-600 bg-transparent outline-none cursor-pointer"
+                      onChange={(e) => e.target.value && asignarEtiqueta.mutate({ tareaId: tareaDetalle.tarea_id, etiquetaId: e.target.value })}
+                      value=""
+                    >
+                      <option value="">+ Añadir</option>
+                      {etiquetasLista
+                        .filter(etq => !(etiquetasPorTarea.get(tareaDetalle.tarea_id) ?? []).some(t => t.etiqueta_id === etq.etiqueta_id))
+                        .map(etq => <option key={etq.etiqueta_id} value={etq.etiqueta_id}>{etq.nombre}</option>)
+                      }
+                    </select>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 min-h-[22px]">
+                    {(etiquetasPorTarea.get(tareaDetalle.tarea_id) ?? []).length === 0
+                      ? <span className="text-[11px] text-stone-300 italic">Sin etiquetas</span>
+                      : (etiquetasPorTarea.get(tareaDetalle.tarea_id) ?? []).map(etq => (
+                          <span key={etq.etiqueta_id} className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold text-white" style={{ backgroundColor: etq.color }}>
+                            {etq.nombre}
+                            <button onClick={() => quitarEtiqueta.mutate({ tareaId: tareaDetalle.tarea_id, etiquetaId: etq.etiqueta_id })} className="hover:opacity-70 rounded">
+                              <X size={9} />
+                            </button>
+                          </span>
+                        ))
+                    }
+                  </div>
+                </div>
+              </section>
+
+              {/* Comentarios */}
+              <section className="space-y-4 pt-2 border-t border-stone-100">
+                <h3 className="text-[11px] font-semibold uppercase tracking-widest text-stone-400">Actividad</h3>
+
+                <div className="rounded-lg border border-stone-200 bg-stone-50 p-3">
+                  <textarea
+                    value={nuevoComentario}
+                    onChange={(e) => setNuevoComentario(e.target.value)}
+                    placeholder="Escribe un comentario…"
+                    rows={2}
+                    className="w-full resize-none bg-transparent text-[13px] text-stone-700 outline-none placeholder:text-stone-400 border-none"
+                  />
+                  <div className="flex justify-end mt-2">
+                    <Button
+                      size="sm"
+                      className="h-7 px-4 text-[12px] bg-purple-600 hover:bg-purple-700"
+                      disabled={!nuevoComentario.trim() || crearComentario.isPending}
+                      onClick={() => crearComentario.mutate(tareaDetalle.tarea_id)}
+                    >
+                      {crearComentario.isPending ? <LoaderCircle size={12} className="animate-spin mr-1" /> : null}
+                      Enviar
+                    </Button>
                   </div>
                 </div>
 
-                {/* Metadatos */}
-                <div className="pt-4 border-t border-stone-100 space-y-1">
-                  <div className="flex justify-between text-[10px] text-stone-400">
-                    <span>Creado por</span>
-                    <span className="text-stone-500">{miembrosPorId.get(tareaDetalle.creado_por)?.nombre_visible || 'Sistema'}</span>
-                  </div>
-                  <div className="flex justify-between text-[10px] text-stone-400">
-                    <span>Creado</span>
-                    <span className="text-stone-500">{new Date(tareaDetalle.creado_en).toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex justify-between text-[10px] text-stone-400">
-                    <span>Actualizado</span>
-                    <span className="text-stone-500">{new Date(tareaDetalle.actualizado_en).toLocaleDateString()}</span>
-                  </div>
-                </div>
-
-                {/* Acciones */}
-                <div className="pt-2">
-                  {confirmarEliminar ? (
-                    <div className="space-y-2 p-3 rounded-lg bg-red-50 border border-red-100">
-                      <p className="text-[11px] font-semibold text-red-600 text-center">¿Eliminar tarea?</p>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="destructive" className="flex-1 h-7 text-[11px]" onClick={() => eliminarTarea.mutate(tareaDetalle.tarea_id)}>Eliminar</Button>
-                        <Button size="sm" variant="outline" className="flex-1 h-7 text-[11px]" onClick={() => setConfirmarEliminar(false)}>Cancelar</Button>
+                <div className="space-y-4">
+                  {comentariosLista.map((c) => (
+                    <div key={c.comentario_id} className="flex gap-3">
+                      <div className={cn("h-7 w-7 shrink-0 rounded-full flex items-center justify-center text-[12px] font-bold", colorAvatar(c.autor_id).bg, colorAvatar(c.autor_id).text)}>
+                        {c.autor_nombre[0].toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-0.5">
+                          <span className="text-[12px] font-semibold text-stone-800">{c.autor_nombre}</span>
+                          <span className="text-[10px] text-stone-400">{new Date(c.creado_en).toLocaleString()}</span>
+                        </div>
+                        <p className="text-[13px] leading-relaxed text-stone-600 whitespace-pre-wrap">{c.contenido}</p>
                       </div>
                     </div>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        className="w-full h-9 bg-purple-600 hover:bg-purple-700 text-[13px] font-semibold"
-                        disabled={actualizarTarea.isPending}
-                        onClick={() => {
-                          if (!formEdicion.titulo.trim()) return setErrorEdicion('Título requerido');
-                          actualizarTarea.mutate({ tareaId: tareaDetalle.tarea_id, payload: construirPayloadEdicion(formEdicion, columnaEdicionId, tareaDetalle) });
-                        }}
-                      >
-                        {actualizarTarea.isPending ? <LoaderCircle size={14} className="animate-spin mr-1.5" /> : null}
-                        Guardar cambios
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="w-full h-8 text-[12px] text-red-400 hover:bg-red-50 hover:text-red-500"
-                        onClick={() => setConfirmarEliminar(true)}
-                      >
-                        <Trash2 size={13} className="mr-1.5" />
-                        Eliminar tarea
-                      </Button>
-                    </div>
+                  ))}
+                  {comentariosLista.length === 0 && (
+                    <p className="text-[12px] text-stone-400 italic">Sin comentarios aún.</p>
                   )}
                 </div>
-              </div>
+              </section>
+
+              {/* Zona de peligro + metadatos */}
+              <section className="pt-2 border-t border-stone-100 space-y-3">
+                <div className="flex items-center justify-between text-[10px] text-stone-400">
+                  <span>Creado por <span className="text-stone-500 font-medium">{miembrosPorId.get(tareaDetalle.creado_por)?.nombre_visible || 'Sistema'}</span></span>
+                  <span>{new Date(tareaDetalle.creado_en).toLocaleDateString()} · act. {new Date(tareaDetalle.actualizado_en).toLocaleDateString()}</span>
+                </div>
+                {confirmarEliminar ? (
+                  <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-100 px-3 py-2.5">
+                    <p className="flex-1 text-[12px] text-red-600 font-medium">¿Eliminar esta tarea?</p>
+                    <Button size="sm" variant="destructive" className="h-7 text-[11px]" onClick={() => eliminarTarea.mutate(tareaDetalle.tarea_id)}>Eliminar</Button>
+                    <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => setConfirmarEliminar(false)}>Cancelar</Button>
+                  </div>
+                ) : (
+                  <button
+                    className="flex items-center gap-1.5 text-[12px] text-stone-400 hover:text-red-500 transition-colors"
+                    onClick={() => setConfirmarEliminar(true)}
+                  >
+                    <Trash2 size={13} />
+                    Eliminar tarea
+                  </button>
+                )}
+              </section>
+            </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
