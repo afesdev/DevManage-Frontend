@@ -533,14 +533,6 @@ export function GithubRepositorioPage() {
   const cntIntegrados = (prs.data ?? []).filter((p) => p.estado === 'integrada').length;
   const totalAdiciones = (archivosPr.data ?? []).reduce((s, a) => s + a.adiciones, 0);
   const totalEliminaciones = (archivosPr.data ?? []).reduce((s, a) => s + a.eliminaciones, 0);
-  const tareasVinculadas = useMemo(() => {
-    const map = new Map<string, { tarea_id: string; titulo: string }>();
-    for (const v of vinculosTareas.data ?? []) {
-      if (!map.has(v.tarea_id)) map.set(v.tarea_id, { tarea_id: v.tarea_id, titulo: v.titulo });
-    }
-    return [...map.values()];
-  }, [vinculosTareas.data]);
-
   const etiquetaEvento = (e: TrazabilidadTareaEvento): string => {
     if (e.tipo === 'rama_creada') return 'Rama detectada';
     if (e.tipo === 'commit') return 'Commit';

@@ -211,7 +211,7 @@ export function AppLayout() {
 
   const UserSection = ({ compacto = false }: { compacto?: boolean }) => {
     const nombre = perfil.data?.nombre_visible;
-    const email = perfil.data?.email;
+    const email = perfil.data?.correo;
     const initials = getInitials(nombre);
 
     return (

@@ -18,7 +18,6 @@ export function AuthPage() {
   const [correo, setCorreo] = useState('');
   const [nombreVisible, setNombreVisible] = useState('');
   const [contrasena, setContrasena] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const setToken = useAuthStore((s) => s.setToken);
   const setProyectoActivo = useAuthStore((s) => s.setProyectoActivo);
   const pushToast = useToastStore((s) => s.pushToast);
@@ -43,7 +42,6 @@ export function AuthPage() {
       navigate('/proyectos');
     },
     onError: () => {
-      setError('No fue posible autenticar. Verifica tus datos.');
       pushToast({ type: 'error', message: 'No se pudo autenticar. Verifica tus datos.' });
     },
   });
@@ -101,7 +99,6 @@ export function AuthPage() {
                 className="space-y-4"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  setError(null);
                   mutation.mutate();
                 }}
               >

@@ -22,9 +22,7 @@ import {
   Hash,
   Layers,
   LoaderCircle,
-  History,
   MessageSquare,
-  Pencil,
   Plus,
   Search,
   SquareKanban,
@@ -306,6 +304,7 @@ function etiquetaActividad(tipo: string): string {
       return tipo.replaceAll('_', ' ');
   }
 }
+void etiquetaActividad;
 
 function obtenerSubDesdeToken(token: string | null): string | null {
   if (!token) return null;
@@ -319,6 +318,7 @@ function obtenerSubDesdeToken(token: string | null): string | null {
     return null;
   }
 }
+void obtenerSubDesdeToken;
 
 function KanbanTareaCard({
   tarea,
@@ -760,6 +760,7 @@ function BloqueDescripcionTrello({
     </div>
   );
 }
+void BloqueDescripcionTrello;
 
 const SELECT_REF_PANEL =
   'h-8 w-full max-w-full min-w-0 rounded-lg border border-stone-200 bg-white px-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-purple-300 disabled:opacity-50';
@@ -890,6 +891,12 @@ export function TableroPage() {
   const [errorComentario, setErrorComentario] = useState<string | null>(null);
   const [comentarioEditando, setComentarioEditando] = useState<ComentarioTareaResumen | null>(null);
   const [contenidoComentarioEdicion, setContenidoComentarioEdicion] = useState('');
+  void usuarioActualId;
+  void errorEdicion;
+  void errorEtiqueta;
+  void errorComentario;
+  void comentarioEditando;
+  void contenidoComentarioEdicion;
 
   // Filtros del tablero
   const [buscarTexto, setBuscarTexto] = useState('');
@@ -1144,6 +1151,11 @@ export function TableroPage() {
       pushToast({ type: 'error', message: 'No se pudo eliminar el comentario.' });
     },
   });
+  void crearEtiqueta;
+  void actualizarEtiqueta;
+  void eliminarEtiqueta;
+  void actualizarComentario;
+  void eliminarComentario;
 
   const reordenarTarea = useMutation({
     mutationFn: (args: { tareaId: string; columnaDestinoId: string; posicionDestino: number }) =>
@@ -1368,6 +1380,7 @@ export function TableroPage() {
     () => (Array.isArray(actividadTarea.data) ? actividadTarea.data : []),
     [actividadTarea.data],
   );
+  void actividadLista;
 
   const etiquetasPorId = useMemo(
     () => new Map(etiquetasLista.map((e) => [e.etiqueta_id, e])),
@@ -1804,7 +1817,7 @@ export function TableroPage() {
                     (acc[nombre] ||= []).push(t);
                     return acc;
                   }, {}),
-                ).map(([persona, items], groupIdx) => (
+                ).map(([persona, items]) => (
                   <div key={persona} className="relative">
                     {/* Encabezado del Responsable */}
                     <div className="mb-6 flex items-center gap-3">

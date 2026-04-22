@@ -102,12 +102,10 @@ export function ProyectosPage() {
   const [crearAbierto, setCrearAbierto] = useState(false);
   const [nombre, setNombre] = useState('');
   const [descripcion, setDescripcion] = useState('');
-  const [errorCrear, setErrorCrear] = useState<string | null>(null);
 
   const [editandoProyectoId, setEditandoProyectoId] = useState<string | null>(null);
   const [nombreEditar, setNombreEditar] = useState('');
   const [descripcionEditar, setDescripcionEditar] = useState('');
-  const [errorEditar, setErrorEditar] = useState<string | null>(null);
 
   const [proyectoAEliminar, setProyectoAEliminar] = useState<{
     proyecto_id: string;
@@ -120,7 +118,6 @@ export function ProyectosPage() {
   const [usuarioInvitarId, setUsuarioInvitarId] = useState('');
   const [buscarUsuarioInvitar, setBuscarUsuarioInvitar] = useState('');
   const [rolInvitar, setRolInvitar] = useState<'administrador' | 'miembro'>('miembro');
-  const [errorEquipo, setErrorEquipo] = useState<string | null>(null);
   const [confirmacionMiembro, setConfirmacionMiembro] = useState<{
     tipo: 'rol' | 'remover';
     usuario_id: string;
@@ -229,7 +226,6 @@ export function ProyectosPage() {
     onSuccess: async (proyecto) => {
       setNombre('');
       setDescripcion('');
-      setErrorCrear(null);
       setCrearAbierto(false);
       setProyectoActivo(proyecto.proyecto_id);
       pushToast({ type: 'ok', message: 'Proyecto creado correctamente.' });
@@ -237,7 +233,6 @@ export function ProyectosPage() {
       navigate(`/tablero/${proyecto.proyecto_id}`);
     },
     onError: () => {
-      setErrorCrear('No se pudo crear el proyecto. Intenta de nuevo.');
       pushToast({ type: 'error', message: 'No se pudo crear el proyecto.' });
     },
   });
@@ -256,12 +251,10 @@ export function ProyectosPage() {
       setEditandoProyectoId(null);
       setNombreEditar('');
       setDescripcionEditar('');
-      setErrorEditar(null);
       pushToast({ type: 'ok', message: 'Proyecto actualizado correctamente.' });
       await queryClient.invalidateQueries({ queryKey: ['proyectos-page', token] });
     },
     onError: () => {
-      setErrorEditar('No se pudo actualizar el proyecto.');
       pushToast({ type: 'error', message: 'No se pudo actualizar el proyecto.' });
     },
   });
@@ -292,7 +285,6 @@ export function ProyectosPage() {
       setUsuarioInvitarId('');
       setBuscarUsuarioInvitar('');
       setRolInvitar('miembro');
-      setErrorEquipo(null);
       pushToast({ type: 'ok', message: 'Miembro agregado correctamente.' });
       await queryClient.invalidateQueries({
         queryKey: ['equipo-miembros', proyectoGestionEquipo?.proyecto_id, token],
@@ -300,7 +292,6 @@ export function ProyectosPage() {
       await queryClient.invalidateQueries({ queryKey: ['proyectos-page', token] });
     },
     onError: () => {
-      setErrorEquipo('No se pudo invitar/agregar al miembro.');
       pushToast({ type: 'error', message: 'No se pudo agregar el miembro.' });
     },
   });
@@ -314,14 +305,12 @@ export function ProyectosPage() {
         token as string,
       ),
     onSuccess: async () => {
-      setErrorEquipo(null);
       pushToast({ type: 'ok', message: 'Rol actualizado correctamente.' });
       await queryClient.invalidateQueries({
         queryKey: ['equipo-miembros', proyectoGestionEquipo?.proyecto_id, token],
       });
     },
     onError: () => {
-      setErrorEquipo('No se pudo actualizar el rol del miembro.');
       pushToast({ type: 'error', message: 'No se pudo actualizar el rol.' });
     },
   });
@@ -334,7 +323,6 @@ export function ProyectosPage() {
         token as string,
       ),
     onSuccess: async () => {
-      setErrorEquipo(null);
       pushToast({ type: 'ok', message: 'Miembro removido correctamente.' });
       await queryClient.invalidateQueries({
         queryKey: ['equipo-miembros', proyectoGestionEquipo?.proyecto_id, token],
@@ -342,7 +330,6 @@ export function ProyectosPage() {
       await queryClient.invalidateQueries({ queryKey: ['proyectos-page', token] });
     },
     onError: () => {
-      setErrorEquipo('No se pudo remover el miembro.');
       pushToast({ type: 'error', message: 'No se pudo remover el miembro.' });
     },
   });
@@ -354,7 +341,6 @@ export function ProyectosPage() {
         token as string,
       ),
     onSuccess: async () => {
-      setErrorEquipo(null);
       pushToast({ type: 'ok', message: 'Sincronización completada correctamente.' });
       await queryClient.invalidateQueries({
         queryKey: ['equipo-miembros', proyectoGestionEquipo?.proyecto_id, token],
@@ -362,7 +348,6 @@ export function ProyectosPage() {
       await queryClient.invalidateQueries({ queryKey: ['proyectos-page', token] });
     },
     onError: () => {
-      setErrorEquipo('No se pudo sincronizar equipo y proyectos.');
       pushToast({ type: 'error', message: 'No se pudo sincronizar equipo y proyectos.' });
     },
   });
@@ -426,10 +411,9 @@ export function ProyectosPage() {
               <Button
                 onClick={() => {
                   if (!nombre.trim()) {
-                    setErrorCrear('El nombre del proyecto es obligatorio.');
+                    pushToast({ type: 'error', message: 'El nombre del proyecto es obligatorio.' });
                     return;
                   }
-                  setErrorCrear(null);
                   crearProyecto.mutate();
                 }}
                 disabled={crearProyecto.isPending}
@@ -441,7 +425,6 @@ export function ProyectosPage() {
                 variant="ghost"
                 onClick={() => {
                   setCrearAbierto(false);
-                  setErrorCrear(null);
                 }}
               >
                 Cancelar
@@ -718,10 +701,9 @@ export function ProyectosPage() {
                         size="sm"
                         onClick={() => {
                           if (!nombreEditar.trim()) {
-                            setErrorEditar('El nombre no puede estar vacío.');
+                            pushToast({ type: 'error', message: 'El nombre no puede estar vacío.' });
                             return;
                           }
-                          setErrorEditar(null);
                           editarProyecto.mutate({
                             proyectoId: proyecto.proyecto_id,
                             nombre: nombreEditar.trim(),
@@ -738,7 +720,6 @@ export function ProyectosPage() {
                         variant="ghost"
                         onClick={() => {
                           setEditandoProyectoId(null);
-                          setErrorEditar(null);
                         }}
                       >
                         Cancelar
@@ -828,7 +809,6 @@ export function ProyectosPage() {
                               setEditandoProyectoId(proyecto.proyecto_id);
                               setNombreEditar(proyecto.nombre);
                               setDescripcionEditar(proyecto.descripcion ?? '');
-                              setErrorEditar(null);
                             }}
                             className="flex h-8 w-8 items-center justify-center rounded-md border border-stone-200 text-stone-500 transition hover:border-stone-300 hover:bg-stone-50 hover:text-stone-700"
                             title="Editar"
