@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { CircleUserRound, Eye, EyeOff, KeyRound, Loader2, Mail, Sparkles } from 'lucide-react';
 import { authService } from '../../services/auth.service';
@@ -41,7 +42,11 @@ export function AuthPage() {
       });
       navigate('/proyectos');
     },
-    onError: () => {
+    onError: (error) => {
+      if (isAxiosError(error) && error.response?.status === 409 && modo === 'registro') {
+        pushToast({ type: 'error', message: 'Ese correo ya está registrado. Inicia sesión o usa otro correo.' });
+        return;
+      }
       pushToast({ type: 'error', message: 'No se pudo autenticar. Verifica tus datos.' });
     },
   });
